@@ -1,35 +1,65 @@
-import os
 from flask import Flask, request, render_template_string
 import requests
 
 app = Flask(__name__)
 
-@app.route("/")
-def home():
-    ip = request.headers.get('X-Forwarded-For', request.remote_addr)
-    # Use only IPv4, if IPv6, get first IPv4 from ipinfo API or fallback
-    ip = ip.split(',')[0].strip()
+HTML_TEMPLATE = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple IP Logger</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
+        .card { background-color: #f2f2f2; padding: 20px; border-radius: 8px; display: inline-block; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; }
+        p { margin: 5px 0; font-size: 18px; }
+        .tag { font-size: 12px; color: #777; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>🎯 IP Logger</h1>
+        <p><strong>Your IP:</strong> {{ ip }}</p>
+        <p><strong>Location:</strong> {{ city }}, {{ region }}, {{ country }}</p>
+        <p><strong>ISP:</strong> {{ isp }}</p>
+        <div class="tag">Tool: subfinder</div>
+    </div>
+</body>
+</html>
+"""
 
-    # Get geolocation info from ipinfo.io
-    response = requests.get(f"https://ipinfo.io/{ip}/json")
-    data = response.json()
-    city = data.get('city', 'Unknown City')
-    region = data.get('region', 'Unknown Region')
-    country = data.get('country', 'Unknown Country')
-    org = data.get('org', 'Unknown Org')
+def get_client_ip(req):
+    return req.headers.get("X-Forwarded-For", req.remote_addr).split(',')[0].strip()
 
-    # Save log
-    with open('logs.txt', 'a') as f:
-        f.write(f"IP: {ip} | Location: {city}, {region}, {country} | ISP: {org}\n")
+def fetch_ip_details(ip):
+    try:
+        res = requests.get(f"https://ipapi.co/{ip}/json", timeout=5)
+        data = res.json()
+        return {
+            "ip": ip,
+            "city": data.get("city", "Unknown"),
+            "region": data.get("region", "Unknown"),
+            "country": data.get("country_name", "Unknown"),
+            "isp": data.get("org", "Unknown")
+        }
+    except Exception as e:
+        return {
+            "ip": ip,
+            "city": "Error",
+            "region": "Error",
+            "country": "Error",
+            "isp": "Error"
+        }
 
-    # Simple page
-    return render_template_string(f"""
-        <h2>Your IP has been logged!</h2>
-        <p><strong>IP:</strong> {ip}</p>
-        <p><strong>Location:</strong> {city}, {region}, {country}</p>
-        <p><strong>ISP:</strong> {org}</p>
-    """)
+@app.route('/')
+def index():
+    ip = get_client_ip(request)
+    info = fetch_ip_details(ip)
 
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))  # Use PORT from Render or default 5000
-    app.run(host="0.0.0.0", port=port)
+    # Log to Render console
+    print(f"[IP LOGGER] IP: {info['ip']} | Location: {info['city']}, {info['region']}, {info['country']} | ISP: {info['isp']}")
+
+    return render_template_string(HTML_TEMPLATE, **info)
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=10000)
