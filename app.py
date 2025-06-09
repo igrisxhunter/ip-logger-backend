@@ -1,76 +1,64 @@
 from flask import Flask, request, render_template_string
-from datetime import datetime
 import requests
-import re
+import os
+from datetime import datetime
 
 app = Flask(__name__)
+
 LOG_FILE = "logs.txt"
 
 HTML_PAGE = """
 <!DOCTYPE html>
 <html>
 <head>
-    <title>IP Logger</title>
+    <title>IP Logger Demo</title>
     <style>
         body {
-            font-family: Arial;
-            background: #121212;
-            color: #fff;
+            font-family: Arial, sans-serif;
+            background-color: #111;
+            color: #0f0;
             text-align: center;
             padding-top: 100px;
         }
         .box {
-            border: 1px solid #555;
-            padding: 40px;
-            margin: auto;
-            width: 400px;
-            background: #1e1e1e;
-            border-radius: 10px;
-            box-shadow: 0 0 15px #222;
+            border: 2px solid #0f0;
+            padding: 20px;
+            display: inline-block;
         }
     </style>
 </head>
 <body>
     <div class="box">
-        <h2>🎯 Your IP has been logged!</h2>
-        <p>Thank you for visiting.</p>
+        <h1>🎯 Your IP has been logged!</h1>
+        <p>This is just a demo logger page.</p>
     </div>
 </body>
 </html>
 """
 
-def extract_ipv4(ip):
-    if "," in ip:
-        ip = ip.split(",")[0]
-    match = re.search(r'\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b', ip)
-    return match.group(0) if match else ip
-
 @app.route('/')
 def index():
-    raw_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
-    ip = extract_ipv4(raw_ip)
-    ua = request.headers.get('User-Agent')
-    time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+    user_agent = request.headers.get('User-Agent')
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     try:
-        geo = requests.get(f"http://ip-api.com/json/{ip}?fields=country,regionName,city,isp,query").json()
-        country = geo.get('country', 'Unknown')
-        region = geo.get('regionName', 'Unknown')
-        city = geo.get('city', 'Unknown')
-        isp = geo.get('isp', 'Unknown')
-    except:
-        country = region = city = isp = "Error"
+        res = requests.get(f"https://ipinfo.io/{ip}/json", timeout=3)
+        geo = res.json()
+        loc = f"{geo.get('city', '')}, {geo.get('region', '')}, {geo.get('country', '')}"
+        org = geo.get("org", "Unknown ISP")
+    except Exception:
+        loc = "Unknown"
+        org = "Unknown"
 
-    log_entry = f"""
-[+] Time       : {time}
-[+] IP         : {ip}
-[+] Location   : {city}, {region}, {country}
-[+] ISP        : {isp}
-[+] User-Agent : {ua}
-------------------------------
-"""
-    print(log_entry)
+    log_entry = f"[{now}] IP: {ip} | Location: {loc} | ISP: {org} | Agent: {user_agent}\n"
+
+    print(log_entry.strip())
     with open(LOG_FILE, "a") as f:
         f.write(log_entry)
 
     return render_template_string(HTML_PAGE)
+
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 5000))  # Needed for Render
+    app.run(host="0.0.0.0", port=port)
