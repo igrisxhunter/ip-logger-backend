@@ -53,7 +53,7 @@ def index():
     is_bot = user_agent.is_bot
 
     if info:
-        log_msg = (
+        app.logger.info(
             f"Visitor IP: {info['IP']}\n"
             f"Location: {info['City']}, {info['Region']}, {info['Country']}\n"
             f"ISP: {info['ISP']}\n"
@@ -67,7 +67,7 @@ def index():
             f"User-Agent: {user_agent_string}"
         )
     else:
-        log_msg = (
+        app.logger.info(
             f"Visitor IP: {ip}\n"
             f"Device Info:\n"
             f"  OS: {os_family} {os_version}\n"
@@ -77,9 +77,94 @@ def index():
             f"User-Agent: {user_agent_string}"
         )
 
-    app.logger.info(log_msg)
+    # Build HTML response
+    return f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>IP & Device Information</title>
+      <style>
+        body {{
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+          background: #eef2f7;
+          color: #333;
+          margin: 0;
+          padding: 2rem;
+          display: flex;
+          justify-content: center;
+          align-items: flex-start;
+          min-height: 100vh;
+        }}
+        .container {{
+          background: white;
+          padding: 2rem 3rem;
+          border-radius: 12px;
+          box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+          max-width: 480px;
+          width: 100%;
+        }}
+        h1 {{
+          color: #2c3e50;
+          margin-bottom: 1rem;
+          text-align: center;
+        }}
+        .section {{
+          margin-bottom: 1.5rem;
+        }}
+        .section h2 {{
+          margin-bottom: 0.5rem;
+          color: #2980b9;
+          border-bottom: 2px solid #2980b9;
+          padding-bottom: 0.25rem;
+          font-size: 1.2rem;
+        }}
+        .info p {{
+          margin: 0.2rem 0;
+          line-height: 1.4;
+          word-wrap: break-word;
+        }}
+        .label {{
+          font-weight: 600;
+          color: #555;
+        }}
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h1>Your IP and Device Info</h1>
 
-    return "Your IP and device info have been logged!"
+        <div class="section">
+          <h2>IP & Location</h2>
+          <div class="info">
+            <p><span class="label">IP:</span> {info['IP'] if info else ip}</p>
+            <p><span class="label">Country:</span> {info['Country'] if info else 'N/A'}</p>
+            <p><span class="label">Region:</span> {info['Region'] if info else 'N/A'}</p>
+            <p><span class="label">City:</span> {info['City'] if info else 'N/A'}</p>
+            <p><span class="label">ISP:</span> {info['ISP'] if info else 'N/A'}</p>
+            <p><span class="label">Timezone:</span> {info['Timezone'] if info else 'N/A'}</p>
+            <p><span class="label">Coordinates:</span> {info['Lat'] if info else 'N/A'}, {info['Lon'] if info else 'N/A'}</p>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Device Info</h2>
+          <div class="info">
+            <p><span class="label">Operating System:</span> {os_family} {os_version}</p>
+            <p><span class="label">Browser:</span> {browser_family} {browser_version}</p>
+            <p><span class="label">Device:</span> {device_family}</p>
+            <p><span class="label">Mobile:</span> {is_mobile}</p>
+            <p><span class="label">Tablet:</span> {is_tablet}</p>
+            <p><span class="label">PC:</span> {is_pc}</p>
+            <p><span class="label">Bot:</span> {is_bot}</p>
+            <p><span class="label">User-Agent:</span> <small>{user_agent_string}</small></p>
+          </div>
+        </div>
+      </div>
+    </body>
+    </html>
+    """
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
